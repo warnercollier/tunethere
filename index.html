@@ -525,7 +525,7 @@
     if(v==="sports") renderSports();
     renderList();
   }
-  vT.onclick=()=>{ setView("tuner"); if(hasLocation) dialEl.focus(); };
+  vT.onclick=()=>{ setView("tuner"); if(hasLocation) dialEl.focus({preventScroll:true}); };
   vL.onclick=()=>setView("list");
   $("ctaSports").onclick=()=>setView("sports");
 
@@ -738,9 +738,19 @@
     listEl.appendChild(frag);
     scrollActiveIntoView();
   }
+  // Reveal a row by scrolling ONLY the list. scrollIntoView also scrolls ancestors on mobile,
+  // which shoved the whole bottom sheet (handle + header) up off-screen.
+  function revealRow(el){
+    if(!el) return;
+    const top=el.offsetTop, bottom=top+el.offsetHeight;
+    const viewTop=listEl.scrollTop, viewBottom=viewTop+listEl.clientHeight;
+    if(top<viewTop) listEl.scrollTop=top;
+    else if(bottom>viewBottom) listEl.scrollTop=bottom-listEl.clientHeight;
+    const rec=document.querySelector(".receiver");
+    rec.scrollTop=0; rec.scrollLeft=0;            // insurance: the panel itself must never scroll
+  }
   function scrollActiveIntoView(){
-    const el=listEl.querySelector(".station.active");
-    if(el) el.scrollIntoView({block:"nearest"});
+    revealRow(listEl.querySelector(".station.active"));
   }
 
   // ---------- Dial rendering ----------
@@ -925,7 +935,7 @@
     staticLevel(0);
     listEl.querySelectorAll(".station.active").forEach(n=>{ n.classList.remove("active"); n.removeAttribute("aria-current"); });
     const row=listEl.querySelector('.station[data-uuid="'+cssEsc(s.stationuuid)+'"]');
-    if(row){ row.classList.add("active"); row.setAttribute("aria-current","true"); row.scrollIntoView({block:"nearest"}); }
+    if(row){ row.classList.add("active"); row.setAttribute("aria-current","true"); revealRow(row); }
     // sync the dial to the played station (only when it's on the current band)
     if(s.freq && s.freq.band===band){ freq=s.freq.value; if(view==="tuner") renderDial(); }
 
@@ -983,6 +993,7 @@
     if(e.key==="Escape"){ e.target.value=""; e.target.blur(); return; }
     if(e.key!=="Enter" || !e.target.value.trim() || searching) return;
     searching=true;
+    e.target.blur();                               // dismiss the mobile keyboard so the viewport restores before the sheet expands
     listStatus("Locating coordinates…");
     try{ const g=await geocode(e.target.value.trim());
       if(!g){ listStatus("No match found","Try a more specific name."); return; }
@@ -990,6 +1001,8 @@
     }catch(_){ listStatus("Scan failed","Check your connection and try again."); }
     finally{ searching=false; }
   });
+  // iOS can leave the page panned up after the keyboard closes, hiding the sheet's top — undo it.
+  $("q").addEventListener("blur", ()=>{ setTimeout(()=>window.scrollTo(0,0), 60); });
 
   // ---------- Sports ("on the radio") ----------
   let sportsLeague="mlb", sportsToken=0;
