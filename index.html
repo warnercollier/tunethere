@@ -256,6 +256,9 @@
     display:flex; align-items:center; gap:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .np .np-sub.error { color:var(--alert); }
   .np .np-freq { font-family:var(--mono); color:var(--signal); letter-spacing:.04em; }
+  .np-spinner { width:10px; height:10px; flex:none; border:2px solid var(--signal-dim);
+    border-top-color:var(--signal); border-radius:50%; display:inline-block; animation:spin .7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
   .signal-bars { display:inline-flex; align-items:flex-end; gap:2px; height:9px; flex:none; }
   .signal-bars i { width:3px; background:var(--signal); border-radius:0; height:30%; opacity:.55; }
   .signal-bars i:nth-child(2){ height:55%; } .signal-bars i:nth-child(3){ height:80%; } .signal-bars i:nth-child(4){ height:100%; }
@@ -795,6 +798,7 @@
     const near=nearestStation();
     let speak = B.fmt(freq)+" "+B.spoken;
     if(near && near.dist<=B.tol*2){
+      warmConnection(near.x.station);            // pre-warm the stream connection as you approach
       const pip=stripEl.querySelector('.pip[data-uuid="'+cssEsc(near.x.station.stationuuid)+'"]');
       if(pip && near.dist<=B.tol) pip.classList.add("near");
       const locked = near.dist<=B.tol;
@@ -902,6 +906,17 @@
 
   // ---------- Playback ----------
   let current=null, lastPlayTs=0;
+  // Speculatively warm DNS+TCP+TLS to a station's stream host as you tune near it, so playback starts sooner.
+  const warmedHosts=new Set();
+  function warmConnection(s){
+    if(!s) return;
+    let origin; try{ origin=new URL(s.url_resolved||s.url).origin; }catch(_){ return; }
+    if(location.protocol==="https:" && origin.indexOf("http://")===0) origin="https:"+origin.slice(5);
+    if(warmedHosts.has(origin)) return;
+    warmedHosts.add(origin);
+    const l=document.createElement("link"); l.rel="preconnect"; l.href=origin;
+    document.head.appendChild(l);
+  }
   function play(s){
     activeUuid=s.stationuuid; current=s;
     staticLevel(0);
@@ -917,27 +932,28 @@
     if(url && location.protocol==="https:" && url.indexOf("http://")===0) url="https:"+url.slice(5);
     if(!url){
       audio.pause(); audio.removeAttribute("src"); audio.load();
-      renderDock(s,true);
+      renderDock(s,"error");
       announce("Couldn’t play "+(s.name||"station")+" — no stream available.");
       return;
     }
     lastPlayTs=Date.now();
     audio.src=url;
     audio.play().catch(()=>{});
-    renderDock(s,false);
+    renderDock(s,"connecting");
     announce("Now playing "+(s.name||"station")+(s.freq?" on "+s.freq.text:""));
     fetch(RB_MIRRORS[0]+"/json/url/"+s.stationuuid).catch(()=>{});
   }
-  function renderDock(s,error){
+  function renderDock(s,mode){    // mode: "connecting" | "live" | "error"
     const f=s.freq;
-    dock.className="dock playing";
+    dock.className="dock playing"+(mode==="connecting"?" connecting":"");
+    let sub;
+    if(mode==="error") sub="Signal lost — tune to another station.";
+    else if(mode==="connecting") sub='<span class="np-spinner" aria-hidden="true"></span>Connecting…';
+    else sub='<span class="signal-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>'+(f?'<span class="np-freq">'+esc(f.text)+'</span>':esc(s.codec||"live"));
     dock.innerHTML=
       '<button class="playbtn" id="pp" aria-label="Pause">'+iconPause()+'</button>'+
       '<div class="np"><div class="np-name">'+esc(s.name||"Unknown")+'</div>'+
-        '<div class="np-sub'+(error?" error":"")+'">'+
-          (error?"Signal lost — tune to another station."
-                :'<span class="signal-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>'+(f?'<span class="np-freq">'+esc(f.text)+'</span>':esc(s.codec||"live")))+
-        '</div></div>'+
+        '<div class="np-sub'+(mode==="error"?" error":"")+'">'+sub+'</div></div>'+
       '<input class="vol" id="vol" type="range" min="0" max="1" step="0.01" value="'+audio.volume+'"'+
         ' aria-label="Volume" aria-valuetext="'+Math.round(audio.volume*100)+'%">';
     $("pp").onclick=togglePlay;
@@ -949,12 +965,12 @@
     };
   }
   function togglePlay(){ if(audio.paused) audio.play().catch(()=>{}); else audio.pause(); }
-  audio.addEventListener("playing",()=>{ dock.classList.add("playing"); const pp=$("pp"); if(pp){ pp.innerHTML=iconPause(); pp.setAttribute("aria-label","Pause"); } });
+  audio.addEventListener("playing",()=>{ if(current) renderDock(current,"live"); });
   audio.addEventListener("pause",  ()=>{ dock.classList.remove("playing"); const pp=$("pp"); if(pp){ pp.innerHTML=iconPlay(); pp.setAttribute("aria-label","Play"); } });
   audio.addEventListener("error",  ()=>{
     if(!current) return;
     if(Date.now()-lastPlayTs < TUNING.errorGrace) return;  // ignore the transient error fired right after a src swap
-    renderDock(current,true);
+    renderDock(current,"error");
     announce("Signal lost on "+(current.name||"station")+". Tune to another station.");
   });
 
