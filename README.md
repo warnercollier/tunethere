@@ -5,8 +5,12 @@ Drop a pin on a map, find nearby FM/AM radio, and tune in — a worldwide radio 
 **Live:** https://tunethere.com
 
 ## Features
-- **Map-first** — tap anywhere or search a place to pull in local stations
+- **Map-first** — tap anywhere, search a place, use your location, or hit *surprise me* to pull in local stations
 - **Tuner** — a tactile dial with co-channel de-duplication (one station per frequency, nearest to your pin) and Web Audio static between stations
+- **Presets** — hold a key (1–6) to save the current station, tap to recall, car-radio style
+- **Shareable links** — the URL tracks your pin and tuned frequency (`/#lat,lon/fm/95.1`), so any spot is a sendable link
+- **Lock-screen controls** — station metadata + play/pause/next via the Media Session API
+- **Installable** — PWA manifest + icons; add it to your home screen
 - **List** + now-playing dock, dark/light themes, keyboard + screen-reader support
 - **Sports** — see which game is "on the radio" (MLB, NHL, NBA, MLS, with NFL/EPL to come) and tune the team's flagship station
 
