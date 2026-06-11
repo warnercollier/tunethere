@@ -271,6 +271,10 @@
   @keyframes bars { 0%,100%{transform:scaleY(.4);} 50%{transform:scaleY(1);} }
   .vol { width:78px; accent-color:var(--signal); cursor:pointer; }
   .vol:focus-visible { outline:2px solid color-mix(in srgb,var(--signal) 55%,transparent); outline-offset:2px; }
+  .skipbtn { font-family:var(--mono); font-size:10.5px; color:var(--signal); background:transparent;
+    border:1px solid var(--signal-dim); border-radius:2px; padding:7px 11px; cursor:pointer; white-space:nowrap; }
+  .skipbtn:hover { background:var(--amber-soft); }
+  .skipbtn:focus-visible { outline:none; box-shadow:0 0 0 2px color-mix(in srgb,var(--signal) 45%,transparent); }
 
   .credits { font-family:var(--mono); font-size:10px; color:var(--faint); text-align:center;
     padding:10px 14px 13px; border-top:1px solid var(--line-2); }
@@ -508,6 +512,8 @@
         audio=$("audio"), srStatus=$("sr-status"), leaguebarEl=$("leaguebar"), gamesEl=$("games");
   const themeColorMeta = document.querySelector('meta[name="theme-color"]');
   const reduceMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  // iOS ignores audio.volume entirely (hardware buttons only) — don't render a dead slider there.
+  const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
 
   // restore last volume
   try { const v=parseFloat(localStorage.getItem("tt.vol")); if(v>=0 && v<=1) audio.volume=v; } catch(_){}
@@ -982,22 +988,41 @@
     announce("Now playing "+(s.name||"station")+(s.freq?" on "+s.freq.text:""));
     fetch(RB_MIRRORS[0]+"/json/url/"+s.stationuuid).catch(()=>{});
   }
+  // Next candidate when a stream dies: walk up the dial on the station's band (wrapping),
+  // else through the full list; skip anything without a stream URL.
+  function nextStation(s){
+    if(!s) return null;
+    const b=s.freq&&s.freq.band;
+    const lst=(b&&byBand[b].length)?byBand[b].map(x=>x.station):allStations;
+    if(!lst.length) return null;
+    const i=lst.findIndex(x=>x.stationuuid===s.stationuuid);
+    for(let k=1;k<=lst.length;k++){
+      const c=lst[(i+k+lst.length)%lst.length];
+      if(c.stationuuid!==s.stationuuid && (c.url_resolved||c.url)) return c;
+    }
+    return null;
+  }
   function renderDock(s,mode){    // mode: "connecting" | "live" | "error"
     const f=s.freq;
     dock.className="dock playing"+(mode==="connecting"?" connecting":"");
     let sub;
-    if(mode==="error") sub="Signal lost — tune to another station.";
+    if(mode==="error") sub="Signal lost";
     else if(mode==="connecting") sub='<span class="np-spinner" aria-hidden="true"></span>Connecting…';
     else sub='<span class="signal-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>'+(f?'<span class="np-freq">'+esc(f.text)+'</span>':esc(s.codec||"live"));
+    const third = mode==="error"
+      ? '<button class="skipbtn" id="skipNext" aria-label="Try the next station">Next ▸</button>'
+      : (IS_IOS ? '' :
+        '<input class="vol" id="vol" type="range" min="0" max="1" step="0.01" value="'+audio.volume+'"'+
+        ' aria-label="Volume" aria-valuetext="'+Math.round(audio.volume*100)+'%">');
     dock.innerHTML=
       '<button class="playbtn" id="pp" aria-label="Pause">'+iconPause()+'</button>'+
       '<div class="np"><div class="np-name">'+esc(s.name||"Unknown")+'</div>'+
-        '<div class="np-sub'+(mode==="error"?" error":"")+'">'+sub+'</div></div>'+
-      '<input class="vol" id="vol" type="range" min="0" max="1" step="0.01" value="'+audio.volume+'"'+
-        ' aria-label="Volume" aria-valuetext="'+Math.round(audio.volume*100)+'%">';
+        '<div class="np-sub'+(mode==="error"?" error":"")+'">'+sub+'</div></div>'+third;
     $("pp").onclick=togglePlay;
+    const sk=$("skipNext");
+    if(sk) sk.onclick=()=>{ const n=nextStation(current); if(n) play(n); else announce("No other stations to try."); };
     const vol=$("vol");
-    vol.oninput=e=>{
+    if(vol) vol.oninput=e=>{
       audio.volume=+e.target.value;
       vol.setAttribute("aria-valuetext", Math.round(audio.volume*100)+"%");
       try{ localStorage.setItem("tt.vol", String(audio.volume)); }catch(_){}
