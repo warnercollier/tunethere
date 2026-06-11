@@ -106,8 +106,9 @@
     box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.04);
     overflow:hidden; animation:rise .45s ease both;
   }
-  @keyframes rise { from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:none;} }
+  @keyframes rise { from{opacity:0;} to{opacity:1;} }
   @keyframes fadeUp { from{opacity:0;transform:translateY(3px);} to{opacity:1;transform:none;} }
+  .sheet-handle { display:none; }
 
   /* ---------- Header / branding ---------- */
   .head { display:flex; align-items:center; gap:12px; padding:16px 16px 14px; border-bottom:1px solid var(--line-2); }
@@ -314,10 +315,23 @@
   @keyframes ping { 0%{transform:scale(.6);opacity:.8;} 100%{transform:scale(2.2);opacity:0;} }
 
   @media (max-width:640px) {
-    .receiver { top:auto; left:8px; right:8px; bottom:calc(8px + env(safe-area-inset-bottom));
-      width:auto; max-height:min(80vh, calc(100dvh - 16px)); border-radius:6px; }
-    .list { min-height:110px; }
+    .receiver {
+      top:auto; left:0; right:0; bottom:0; width:auto; max-width:none;
+      height:88vh; height:88dvh; max-height:none;
+      border-radius:16px 16px 0 0; animation:none;
+      transform:translateY(30vh);
+      transition:transform .3s cubic-bezier(.2,.7,.2,1);
+    }
+    .receiver.sheet-dragging { transition:none; }
+    .sheet-handle { display:block; height:22px; flex:none; position:relative; touch-action:none; cursor:grab; }
+    .sheet-handle::before { content:""; position:absolute; top:9px; left:50%; transform:translateX(-50%);
+      width:38px; height:4px; border-radius:2px; background:var(--muted); opacity:.55; }
+    .list { min-height:120px; }
     .rd-freq,.rd-ghost { font-size:34px; }
+    .seg button { padding-top:12px; padding-bottom:12px; }
+    .leaguebar button { padding-top:12px; padding-bottom:12px; }
+    .credits { padding-bottom:calc(13px + env(safe-area-inset-bottom)); }
+    .maplibregl-ctrl-bottom-right .maplibregl-ctrl-group { display:none; }
   }
   @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important; transition:none!important; } }
 </style>
@@ -337,6 +351,7 @@
   </noscript>
 
   <section class="receiver" aria-label="Radio receiver">
+    <div class="sheet-handle" id="sheetHandle" role="button" tabindex="0" aria-label="Drag to resize panel"></div>
     <header class="head">
       <div class="brand">
         <span class="wordmark">Tune<b>There</b></span>
@@ -583,6 +598,7 @@
   async function setLocation(lat,lon){
     const token=++reqToken; hasLocation=true;
     pinLat=lat; pinLon=lon;
+    if(isMobileSheet() && sheetSnap==="peek") setSnap("half");   // pin dropped from the map → raise the sheet
     clearTimeout(settleTimer); staticLevel(0);     // drop any pending snap / lingering hiss from the last spot
     dialEl.setAttribute("aria-disabled","false");
     if(marker) marker.setLngLat([lon,lat]);
@@ -1087,6 +1103,52 @@
   function wave(){ return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12h3l3-7 4 14 3-10 2 3h5"/></svg>'; }
   function iconPlay(){ return '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5v14l12-7z"/></svg>'; }
   function iconPause(){ return '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>'; }
+
+  // ---------- Mobile bottom sheet (peek / half / full) ----------
+  const sheetEl=document.querySelector(".receiver"), sheetHandle=$("sheetHandle");
+  let sheetSnap="half", sheetDragging=false, sheetStartY=0, sheetBaseY=0, sheetDy=0;
+  const isMobileSheet=()=> window.matchMedia("(max-width:640px)").matches;
+  function snapY(state){
+    const ih=window.innerHeight, H=sheetEl.getBoundingClientRect().height;
+    if(state==="full") return 0;
+    if(state==="half") return Math.max(0, H - ih*0.60);
+    return Math.max(0, H - 108);                 // peek — just the handle + brand
+  }
+  function applySheet(){
+    if(!isMobileSheet()){ sheetEl.style.transform=""; return; }
+    sheetEl.style.transform="translateY("+snapY(sheetSnap)+"px)";
+  }
+  function setSnap(s){ sheetSnap=s; sheetEl.classList.remove("sheet-dragging"); applySheet(); }
+  sheetHandle.addEventListener("pointerdown", e=>{
+    if(!isMobileSheet()) return;
+    sheetDragging=true; sheetStartY=e.clientY; sheetBaseY=snapY(sheetSnap); sheetDy=0;
+    sheetEl.classList.add("sheet-dragging");
+    try{ sheetHandle.setPointerCapture(e.pointerId); }catch(_){}
+  });
+  sheetHandle.addEventListener("pointermove", e=>{
+    if(!sheetDragging) return;
+    sheetDy=e.clientY-sheetStartY;
+    const H=sheetEl.getBoundingClientRect().height;
+    sheetEl.style.transform="translateY("+Math.max(0, Math.min(sheetBaseY+sheetDy, H-70))+"px)";
+  });
+  function endSheetDrag(e){
+    if(!sheetDragging) return; sheetDragging=false;
+    try{ sheetHandle.releasePointerCapture(e.pointerId); }catch(_){}
+    if(Math.abs(sheetDy)<6){ setSnap(sheetSnap==="peek"?"half": sheetSnap==="half"?"full":"peek"); return; }  // tap cycles
+    const cur=sheetBaseY+sheetDy, opts={ full:snapY("full"), half:snapY("half"), peek:snapY("peek") };
+    let best="half", bd=Infinity;
+    for(const k in opts){ const d=Math.abs(cur-opts[k]); if(d<bd){ bd=d; best=k; } }
+    setSnap(best);
+  }
+  sheetHandle.addEventListener("pointerup", endSheetDrag);
+  sheetHandle.addEventListener("pointercancel", endSheetDrag);
+  sheetHandle.addEventListener("keydown", e=>{
+    if(e.key==="ArrowUp"){ e.preventDefault(); setSnap(sheetSnap==="peek"?"half":"full"); }
+    else if(e.key==="ArrowDown"){ e.preventDefault(); setSnap(sheetSnap==="full"?"half":"peek"); }
+    else if(e.key==="Enter"||e.key===" "){ e.preventDefault(); setSnap(sheetSnap==="full"?"peek":"full"); }
+  });
+  window.addEventListener("resize", applySheet);
+  applySheet();
 
   buildStrip(); requestAnimationFrame(renderDial);
   setView("tuner");
