@@ -127,9 +127,10 @@
     padding:5px 13px; border-radius:2px; transition:color .15s, background .15s; }
   .seg button:hover { color:var(--text); }
   .seg button[aria-pressed="true"] { color:#fff; background:var(--signal); }
+  /* dark mode: same light gold as every other accent; dark label since white fails contrast on it */
   [data-theme="dark"] .seg button[aria-pressed="true"],
   [data-theme="dark"] .leaguebar button[aria-pressed="true"],
-  [data-theme="dark"] .sports-cta button { background:#b86e15; border-color:#b86e15; }
+  [data-theme="dark"] .sports-cta button { color:#17120a; }
   .seg button:focus-visible { outline:none; box-shadow:0 0 0 2px color-mix(in srgb,var(--signal) 55%,transparent); }
   .head .seg { margin-left:auto; }
 
