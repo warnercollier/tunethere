@@ -349,9 +349,17 @@
       border-right:2px solid var(--muted); border-bottom:2px solid var(--muted);
       transform:translate(-50%,-3px) rotate(-135deg); transition:transform .2s ease; opacity:.7; }
     .sheet-open .sheet-handle::before { transform:translate(-50%,1px) rotate(45deg); }
-    .list { min-height:120px; }
+    .list { min-height:100px; }
     .rd-freq,.rd-ghost { font-size:34px; }
     .seg button { padding-top:12px; padding-bottom:12px; }
+    .views { padding:8px 16px 2px; }
+    .credits { padding:7px 14px calc(8px + env(safe-area-inset-bottom)); }
+    /* FM/AM folds into the readout's top-right corner — frees a whole row so the dock stays on-screen */
+    .tuner { position:relative; }
+    .bandrow { position:absolute; top:15px; right:24px; margin:0; }
+    .bandrow .seg button { padding:5px 9px; font-size:10px; }
+    .readout { text-align:left; padding-left:18px; }
+    .rd-near { text-align:left; }
     .leaguebar button { padding-top:12px; padding-bottom:12px; }
     .credits { padding-bottom:calc(13px + env(safe-area-inset-bottom)); }
     .maplibregl-ctrl-bottom-right .maplibregl-ctrl-group { display:none; }
