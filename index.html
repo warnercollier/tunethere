@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>TuneThere — drop a pin, tune in</title>
 <meta name="description" content="Drop a pin anywhere on the map and tune into local FM & AM radio from that spot. A worldwide radio receiver that runs in your browser." />
-<meta name="theme-color" content="#ece8e0" />
+<meta name="theme-color" content="#0a0a0b" />
 <link rel="canonical" href="https://tunethere.com/" />
 
 <!-- Social cards (replace tunethere.com and add og-image.png before going live) -->
@@ -68,7 +68,7 @@
   [data-theme="light"] .dial { background:linear-gradient(180deg, rgba(0,0,0,.045), transparent 45%); }
   [data-theme="light"] .seg { background:rgba(0,0,0,.035); }
   * { box-sizing:border-box; }
-  html { background:#ece8e0; }
+  html { background:#0a0a0b; }
   html,body { height:100%; margin:0; }
   body { font-family:var(--sans);
          background:var(--bg); color:var(--text); overflow:hidden;
@@ -376,7 +376,7 @@
     <button id="ctaSports" type="button" aria-label="Open TuneThere Sports">Sports</button>
   </div>
   <noscript>
-    <div style="position:fixed;inset:0;display:grid;place-items:center;background:#ece8e0;color:#1c1813;
+    <div style="position:fixed;inset:0;display:grid;place-items:center;background:#0a0a0b;color:#ece7df;
       font-family:system-ui,sans-serif;padding:24px;text-align:center;z-index:9999">
       TuneThere needs JavaScript enabled to load the map and stream radio.
     </div>
@@ -390,8 +390,8 @@
         <span class="tagline">tap the map to drop a pin · tune in</span>
       </div>
       <div class="seg" role="group" aria-label="Map theme">
-        <button id="themeLight" aria-pressed="true">Light</button>
-        <button id="themeDark" aria-pressed="false">Dark</button>
+        <button id="themeDark" aria-pressed="true">Dark</button>
+        <button id="themeLight" aria-pressed="false">Light</button>
       </div>
     </header>
 
@@ -494,7 +494,7 @@
   };
 
   // ---------- State ----------
-  let theme="light", band="fm", view="tuner";
+  let theme="dark", band="fm", view="tuner";
   let marker=null, activeUuid=null, reqToken=0;
   let allStations=[], byBand={fm:[], am:[]};
   let freq=98.0, hasLocation=false;
@@ -515,7 +515,7 @@
 
   // ---------- Map ----------
   const map = new maplibregl.Map({
-    container:"map", style:STYLES.light, center:[-80.84,35.23], zoom:9,
+    container:"map", style:STYLES.dark, center:[-80.84,35.23], zoom:9,
     attributionControl:{ compact:true },
   });
   map.addControl(new maplibregl.NavigationControl({ showCompass:false }), "bottom-right");
